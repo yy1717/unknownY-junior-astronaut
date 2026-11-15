@@ -160,6 +160,25 @@ export class Game extends Phaser.Scene
     private closePanelKey!: Phaser.Input.Keyboard.Key;
     private codexKey!: Phaser.Input.Keyboard.Key;
 
+    private readonly touchCapable =
+        typeof window !== 'undefined' &&
+        (
+            'ontouchstart' in window ||
+            navigator.maxTouchPoints > 0
+        );
+
+    private touchUp = false;
+    private touchDown = false;
+    private touchLeft = false;
+    private touchRight = false;
+
+    private touchUseRequested = false;
+    private touchLearnRequested = false;
+    private touchEclssRequested = false;
+    private touchNotesRequested = false;
+
+    private touchControlObjects: Phaser.GameObjects.GameObject[] = [];
+
     // =====================================================
     // UI
     // =====================================================
@@ -285,6 +304,7 @@ export class Game extends Phaser.Scene
     create()
     {
         this.resetRuntimeState();
+        this.resetTouchInput();
 
         this.saveData =
             this.loadSaveData();
@@ -337,10 +357,14 @@ export class Game extends Phaser.Scene
             return;
         }
 
+        const touchNotesPressed =
+            this.consumeTouchNotes();
+
         if (
             Phaser.Input.Keyboard.JustDown(
                 this.codexKey
-            )
+            ) ||
+            touchNotesPressed
         )
         {
             this.showCodexPanel();
@@ -363,6 +387,31 @@ export class Game extends Phaser.Scene
             return;
         }
 
+        const touchUsePressed =
+            this.consumeTouchUse();
+        const touchLearnPressed =
+            this.consumeTouchLearn();
+        const touchEclssPressed =
+            this.consumeTouchEclss();
+
+        const usePressed =
+            Phaser.Input.Keyboard.JustDown(
+                this.interactKey
+            ) ||
+            touchUsePressed;
+
+        const learnPressed =
+            Phaser.Input.Keyboard.JustDown(
+                this.learnKey
+            ) ||
+            touchLearnPressed;
+
+        const eclssPressed =
+            Phaser.Input.Keyboard.JustDown(
+                this.lifeSupportKey
+            ) ||
+            touchEclssPressed;
+
         // =================================================
         // MOVEMENT
         // =================================================
@@ -375,7 +424,8 @@ export class Game extends Phaser.Scene
 
         if (
             this.cursors.left.isDown ||
-            this.wasd.A.isDown
+            this.wasd.A.isDown ||
+            this.touchLeft
         )
         {
             dx -= 1;
@@ -383,7 +433,8 @@ export class Game extends Phaser.Scene
 
         if (
             this.cursors.right.isDown ||
-            this.wasd.D.isDown
+            this.wasd.D.isDown ||
+            this.touchRight
         )
         {
             dx += 1;
@@ -391,7 +442,8 @@ export class Game extends Phaser.Scene
 
         if (
             this.cursors.up.isDown ||
-            this.wasd.W.isDown
+            this.wasd.W.isDown ||
+            this.touchUp
         )
         {
             dy -= 1;
@@ -399,7 +451,8 @@ export class Game extends Phaser.Scene
 
         if (
             this.cursors.down.isDown ||
-            this.wasd.S.isDown
+            this.wasd.S.isDown ||
+            this.touchDown
         )
         {
             dy += 1;
@@ -515,20 +568,12 @@ export class Game extends Phaser.Scene
                 '[E] OPEN SPACE LIBRARY\n[L] QUICK LEARN'
             );
 
-            if (
-                Phaser.Input.Keyboard.JustDown(
-                    this.interactKey
-                )
-            )
+            if (usePressed)
             {
                 this.showSpaceLibrary();
             }
 
-            if (
-                Phaser.Input.Keyboard.JustDown(
-                    this.learnKey
-                )
-            )
+            if (learnPressed)
             {
                 this.showSpaceLibraryArticle(
                     'space-weather',
@@ -558,20 +603,12 @@ export class Game extends Phaser.Scene
                 );
             }
 
-            if (
-                Phaser.Input.Keyboard.JustDown(
-                    this.interactKey
-                )
-            )
+            if (usePressed)
             {
                 this.requestEarthGuidance();
             }
 
-            if (
-                Phaser.Input.Keyboard.JustDown(
-                    this.learnKey
-                )
-            )
+            if (learnPressed)
             {
                 this.showLearnPanel('communication');
             }
@@ -598,20 +635,12 @@ export class Game extends Phaser.Scene
                 );
             }
 
-            if (
-                Phaser.Input.Keyboard.JustDown(
-                    this.interactKey
-                )
-            )
+            if (usePressed)
             {
                 this.useGreenhouse();
             }
 
-            if (
-                Phaser.Input.Keyboard.JustDown(
-                    this.learnKey
-                )
-            )
+            if (learnPressed)
             {
                 this.showLearnPanel('greenhouse');
             }
@@ -638,20 +667,12 @@ export class Game extends Phaser.Scene
                 );
             }
 
-            if (
-                Phaser.Input.Keyboard.JustDown(
-                    this.interactKey
-                )
-            )
+            if (usePressed)
             {
                 this.useSolarArray();
             }
 
-            if (
-                Phaser.Input.Keyboard.JustDown(
-                    this.learnKey
-                )
-            )
+            if (learnPressed)
             {
                 this.showLearnPanel('solar');
             }
@@ -671,11 +692,7 @@ export class Game extends Phaser.Scene
                     '[E] ENTER RADIATION SHELTER'
                 );
 
-                if (
-                    Phaser.Input.Keyboard.JustDown(
-                        this.interactKey
-                    )
-                )
+                if (usePressed)
                 {
                     this.enterRadiationShelter();
                 }
@@ -686,20 +703,12 @@ export class Game extends Phaser.Scene
                     '[E] INSPECT SHELTER   •   [L] LEARN'
                 );
 
-                if (
-                    Phaser.Input.Keyboard.JustDown(
-                        this.interactKey
-                    )
-                )
+                if (usePressed)
                 {
                     this.showShelterInfo();
                 }
 
-                if (
-                    Phaser.Input.Keyboard.JustDown(
-                        this.learnKey
-                    )
-                )
+                if (learnPressed)
                 {
                     this.showLearnPanel('shelter');
                 }
@@ -718,29 +727,17 @@ export class Game extends Phaser.Scene
                 '[E] INSPECT   •   [R] ECLSS   •   [L] LEARN'
             );
 
-            if (
-                Phaser.Input.Keyboard.JustDown(
-                    this.interactKey
-                )
-            )
+            if (usePressed)
             {
                 this.showHabitatInfo();
             }
 
-            if (
-                Phaser.Input.Keyboard.JustDown(
-                    this.lifeSupportKey
-                )
-            )
+            if (eclssPressed)
             {
                 this.toggleECLSS();
             }
 
-            if (
-                Phaser.Input.Keyboard.JustDown(
-                    this.learnKey
-                )
-            )
+            if (learnPressed)
             {
                 this.showLearnPanel('habitat');
             }
@@ -999,7 +996,7 @@ export class Game extends Phaser.Scene
         this.add.text(
             this.scale.width / 2,
             615,
-            'CLICK START OR PRESS ENTER',
+            'TAP START OR PRESS ENTER',
             {
                 fontFamily: this.bodyFont,
                 fontSize: '22px',
@@ -1618,7 +1615,7 @@ export class Game extends Phaser.Scene
         this.add.text(
             265,
             576,
-            'WASD / ARROWS — MOVE     E — USE     L — LEARN     R — TOGGLE ECLSS',
+            'KEYBOARD OR TOUCH     MOVE • USE • LEARN • ECLSS',
             {
                 fontFamily: this.bodyFont,
                 fontSize: '22px',
@@ -1696,6 +1693,7 @@ export class Game extends Phaser.Scene
         }
 
         this.gameStarted = true;
+        this.resetTouchInput();
 
         this.loadPlanetProgress();
 
@@ -1704,6 +1702,7 @@ export class Game extends Phaser.Scene
         this.buildOutpost();
         this.setupControls();
         this.createHUD();
+        this.createTouchControls();
 
         // NASA calls only begin once
         // the actual mission starts.
@@ -1756,7 +1755,7 @@ export class Game extends Phaser.Scene
         this.add.text(
             24,
             58,
-            'WASD / ARROWS: MOVE   •   E: USE   •   L: LEARN   •   K: SPACE CODEX',
+            'KEYBOARD OR TOUCH: MOVE   •   USE   •   LEARN   •   SPACE NOTES',
             {
                 fontFamily: this.bodyFont,
                 fontSize: '20px',
@@ -2724,6 +2723,226 @@ export class Game extends Phaser.Scene
             );
     }
 
+    private resetTouchInput()
+    {
+        this.touchUp = false;
+        this.touchDown = false;
+        this.touchLeft = false;
+        this.touchRight = false;
+
+        this.touchUseRequested = false;
+        this.touchLearnRequested = false;
+        this.touchEclssRequested = false;
+        this.touchNotesRequested = false;
+    }
+
+    private consumeTouchUse()
+    {
+        const requested = this.touchUseRequested;
+        this.touchUseRequested = false;
+
+        return requested;
+    }
+
+    private consumeTouchLearn()
+    {
+        const requested = this.touchLearnRequested;
+        this.touchLearnRequested = false;
+
+        return requested;
+    }
+
+    private consumeTouchEclss()
+    {
+        const requested = this.touchEclssRequested;
+        this.touchEclssRequested = false;
+
+        return requested;
+    }
+
+    private consumeTouchNotes()
+    {
+        const requested = this.touchNotesRequested;
+        this.touchNotesRequested = false;
+
+        return requested;
+    }
+
+    private createTouchControls()
+    {
+        if (!this.touchCapable)
+        {
+            return;
+        }
+
+        const dpadX = this.worldLeft + 58;
+        const dpadY = this.worldBottom - 100;
+        const dpadOffset = 46;
+
+        this.createTouchHoldButton(
+            dpadX,
+            dpadY - dpadOffset,
+            'UP',
+            () => { this.touchUp = true; },
+            () => { this.touchUp = false; }
+        );
+
+        this.createTouchHoldButton(
+            dpadX,
+            dpadY + dpadOffset,
+            'DOWN',
+            () => { this.touchDown = true; },
+            () => { this.touchDown = false; }
+        );
+
+        this.createTouchHoldButton(
+            dpadX - dpadOffset,
+            dpadY,
+            'LEFT',
+            () => { this.touchLeft = true; },
+            () => { this.touchLeft = false; }
+        );
+
+        this.createTouchHoldButton(
+            dpadX + dpadOffset,
+            dpadY,
+            'RIGHT',
+            () => { this.touchRight = true; },
+            () => { this.touchRight = false; }
+        );
+
+        const actionLeft = this.worldRight - 142;
+        const actionRight = this.worldRight - 50;
+
+        this.createTouchActionButton(
+            actionLeft,
+            this.worldBottom - 130,
+            'USE',
+            () => { this.touchUseRequested = true; },
+            0xffd166
+        );
+
+        this.createTouchActionButton(
+            actionRight,
+            this.worldBottom - 130,
+            'LEARN',
+            () => { this.touchLearnRequested = true; },
+            0x66ddff
+        );
+
+        this.createTouchActionButton(
+            actionLeft,
+            this.worldBottom - 70,
+            'ECLSS',
+            () => { this.touchEclssRequested = true; },
+            0x69d58c
+        );
+
+        this.createTouchActionButton(
+            actionRight,
+            this.worldBottom - 70,
+            'NOTES',
+            () => { this.touchNotesRequested = true; },
+            0x9e9cff
+        );
+    }
+
+    private createTouchHoldButton(
+        x: number,
+        y: number,
+        label: string,
+        press: () => void,
+        release: () => void
+    )
+    {
+        const button = this.createTouchButton(
+            x,
+            y,
+            56,
+            56,
+            label,
+            0x66ddff
+        );
+
+        const releaseButton = () =>
+        {
+            release();
+            button.setFillStyle(0x142536, 0.78);
+        };
+
+        button
+            .on('pointerdown', () =>
+            {
+                press();
+                button.setFillStyle(0x31566d, 0.92);
+            })
+            .on('pointerup', releaseButton)
+            .on('pointerout', releaseButton)
+            .on('pointerupoutside', releaseButton);
+    }
+
+    private createTouchActionButton(
+        x: number,
+        y: number,
+        label: string,
+        action: () => void,
+        accent: number
+    )
+    {
+        const button = this.createTouchButton(
+            x,
+            y,
+            86,
+            52,
+            label,
+            accent
+        );
+
+        button.on('pointerdown', action);
+    }
+
+    private createTouchButton(
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        label: string,
+        accent: number
+    )
+    {
+        const button =
+            this.add.rectangle(
+                x,
+                y,
+                width,
+                height,
+                0x142536,
+                0.78
+            )
+            .setStrokeStyle(3, accent, 0.9)
+            .setDepth(25)
+            .setInteractive({ useHandCursor: true });
+
+        const text =
+            this.add.text(
+                x,
+                y,
+                label,
+                {
+                    fontFamily: this.headingFont,
+                    fontSize: '20px',
+                    color: '#ffffff',
+                    align: 'center'
+                }
+            )
+            .setOrigin(0.5)
+            .setDepth(26);
+
+        this.touchControlObjects.push(button, text);
+
+        return button;
+    }
+
     // =====================================================
     // HUD
     // =====================================================
@@ -3002,7 +3221,7 @@ export class Game extends Phaser.Scene
         {
             this.tutorialText.setText([
                 'STEP 1 • FIND THE HABITAT',
-                'Walk close and press E to inspect it.',
+                'Walk close and press E or USE.',
                 'Astronauts live, rest, and stay safe inside.'
             ]);
         }
@@ -3011,7 +3230,7 @@ export class Game extends Phaser.Scene
         {
             this.tutorialText.setText([
                 'STEP 2 • START LIFE SUPPORT',
-                'Stay near the Habitat and press R.',
+                'Stay near the Habitat and press R or ECLSS.',
                 'Watch how ECLSS uses Battery power.'
             ]);
         }
@@ -3020,7 +3239,7 @@ export class Game extends Phaser.Scene
         {
             this.tutorialText.setText([
                 'STEP 3 • RECHARGE THE BATTERY',
-                'Find the Solar Array and press E.',
+                'Find the Solar Array and press E or USE.',
                 'Solar panels turn sunlight into electricity.'
             ]);
         }
@@ -3029,7 +3248,7 @@ export class Game extends Phaser.Scene
         {
             this.tutorialText.setText([
                 'STEP 4 • GROW SPACE FOOD',
-                'Find the Greenhouse and press E to start a crop.',
+                'Find the Greenhouse and press E or USE.',
                 'Plants need Water and electricity to grow.'
             ]);
         }
@@ -3040,7 +3259,7 @@ export class Game extends Phaser.Scene
             {
                 this.tutorialText.setText([
                     'STEP 5 • CONTACT EARTH',
-                    'Find the Comm Station and press E.',
+                    'Find the Comm Station and press E or USE.',
                     'Moon messages reach Earth fairly quickly.'
                 ]);
             }
@@ -3048,7 +3267,7 @@ export class Game extends Phaser.Scene
             {
                 this.tutorialText.setText([
                     'STEP 5 • CONTACT EARTH',
-                    'Find the Comm Station and press E.',
+                    'Find the Comm Station and press E or USE.',
                     'Mars messages can take many minutes.'
                 ]);
             }
@@ -3059,7 +3278,7 @@ export class Game extends Phaser.Scene
             this.tutorialText.setText([
                 'STEP 6 • FIND THE SAFETY SHELTER',
                 'Crews sometimes act before Earth can reply.',
-                'Find the Radiation Shelter and press E.'
+                'Find the Radiation Shelter and press E or USE.'
             ]);
         }
     }
@@ -4114,6 +4333,7 @@ export class Game extends Phaser.Scene
 
     private openResearchBreak()
     {
+        this.resetTouchInput();
         this.upgradeMenuOpen = true;
 
         this.updateHUD();
@@ -4717,7 +4937,8 @@ export class Game extends Phaser.Scene
             0x03070c,
             0.78
         )
-        .setDepth(140);
+        .setDepth(140)
+        .setInteractive();
 
         this.createPixelPanel(
             this.scale.width / 2,
@@ -4763,6 +4984,7 @@ export class Game extends Phaser.Scene
         }
 
         this.missionEnded = true;
+        this.resetTouchInput();
 
         this.savePlanetProgress();
 
@@ -4783,7 +5005,7 @@ export class Game extends Phaser.Scene
             '',
             'YOU CAN DO IT, COMMANDER!',
             '',
-            '[ SPACE ]  TRY AGAIN'
+            '[ SPACE / TAP ]  TRY AGAIN'
         ]);
 
         this.emergencyText.setText('').setVisible(false);
@@ -4804,6 +5026,10 @@ export class Game extends Phaser.Scene
                 this.scene.restart();
             }
         );
+
+        this.tutorialText
+            .setInteractive({ useHandCursor: true })
+            .once('pointerdown', () => this.scene.restart());
     }
 
     private completeMission()
@@ -4814,6 +5040,7 @@ export class Game extends Phaser.Scene
         }
 
         this.missionEnded = true;
+        this.resetTouchInput();
 
         if (this.missionTimer)
         {
@@ -4896,7 +5123,7 @@ export class Game extends Phaser.Scene
             '',
             'Great work, Commander!',
             '',
-            '[ SPACE ]  PLAY AGAIN'
+            '[ SPACE / TAP ]  PLAY AGAIN'
         ]);
 
         this.emergencyText.setText('').setVisible(false);
@@ -4913,6 +5140,10 @@ export class Game extends Phaser.Scene
                 this.scene.restart();
             }
         );
+
+        this.tutorialText
+            .setInteractive({ useHandCursor: true })
+            .once('pointerdown', () => this.scene.restart());
     }
 
     // =====================================================
@@ -5126,7 +5357,7 @@ export class Game extends Phaser.Scene
             'It provides space to live, work, and rest.',
             '',
             'ECLSS manages air and water for the crew.',
-            'Press R nearby to turn ECLSS on or off.',
+            'Press R or ECLSS nearby to turn it on or off.',
             'Remember: ECLSS needs electricity.'
         ]);
 
@@ -5624,6 +5855,7 @@ export class Game extends Phaser.Scene
 
     private showCodexPanel()
     {
+        this.resetTouchInput();
         this.closeReadingPanel();
 
         const overlay =
@@ -5992,6 +6224,7 @@ export class Game extends Phaser.Scene
 
     private createSpaceLibraryFrame(title: string)
     {
+        this.resetTouchInput();
         this.closeReadingPanel();
 
         const overlay =
@@ -6239,6 +6472,7 @@ export class Game extends Phaser.Scene
         accentColor: number
     )
     {
+        this.resetTouchInput();
         this.closeReadingPanel();
 
         const panelWidth =
@@ -6728,6 +6962,7 @@ export class Game extends Phaser.Scene
 
         this.readingPanelOpen = false;
         this.readingPanelObjects = [];
+        this.touchControlObjects = [];
     }
 
     // =====================================================

@@ -11,6 +11,9 @@ const config: Types.Core.GameConfig = {
     backgroundColor: '#028af8',
     pixelArt: true,
     roundPixels: true,
+    input: {
+        activePointers: 3
+    },
     scale: {
         mode: Scale.FIT,
         autoCenter: Scale.CENTER_BOTH
